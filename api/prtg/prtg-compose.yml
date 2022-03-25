@@ -1,0 +1,20 @@
+version: "3.8"
+services:
+  prtg:
+    image: nginxdemos/hello # replace with PRTG when implemented
+    labels:
+      caddy: ${SUBDOMAIN}.localhost
+      caddy.reverse_proxy: "{{upstreams 80}}"
+    networks:
+      - caddy
+      - prtg_net
+    restart: unless-stopped
+
+networks:
+  caddy:
+    external: true
+  prtg_net:
+    # NOTE networks cannot share the same subnet
+    # ipam:
+    #   config:
+    #     - subnet: "172.16.238.0/24"

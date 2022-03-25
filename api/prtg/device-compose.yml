@@ -1,0 +1,16 @@
+version: "3.8"
+services:
+  device:
+    image: lscr.io/linuxserver/openssh-server # replace with fake device when implemented
+    networks:
+      prtg_net:
+        # NOTE networks cannot share the same subnet, and therefore, the same IP address
+        # ipv4_address: $DEV_IP_ADDR
+        aliases:
+          - $DEV_HOST
+    restart: unless-stopped
+
+networks:
+  prtg_net:
+    external: true
+    name: ${PRTG_NAME}_prtg_net

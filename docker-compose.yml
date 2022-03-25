@@ -1,0 +1,37 @@
+version: "3.8"
+services:
+  caddy:
+    environment:
+      - CADDY_INGRESS_NETWORKS=caddy
+    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    networks:
+      - caddy
+    ports:
+      - 80:80
+      - 443:443
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - caddy_data:/data
+  xsautomate:
+    image: xsautomate-api
+    build: ./reconcile-snow-prtg
+    restart: unless-stopped
+  api:
+    image: prtg-standup-api
+    build: .
+    labels:
+      caddy: localhost
+      caddy.reverse_proxy: "{{upstreams 80}}"
+    networks:
+      - caddy
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+  
+networks:
+  caddy:
+    external: true
+
+volumes:
+  caddy_data: {}
