@@ -1,3 +1,4 @@
+import asyncio
 import logging.handlers
 import re
 import sys
@@ -5,7 +6,6 @@ from subprocess import CalledProcessError
 
 from fastapi import FastAPI, HTTPException
 from loguru import logger
-from pydantic import BaseModel
 from requests import ConnectionError, HTTPError, Timeout
 
 from config import config
@@ -14,6 +14,7 @@ from prtg import docker, snow_import
 
 TOKEN = config['api']['token']
 DOMAIN = config['api']['domain']
+ATTEMPTS = config['api'].getint('attempts')
 LOG_LEVEL = config['logger']['log_level'].upper()
 SYSLOG = config['logger'].getboolean('syslog')
 SYSLOG_HOST = config['logger']['syslog_host']
@@ -34,17 +35,24 @@ description='''Welcome to Expert Services' PRTG demo API. Test the Expert Servic
 
 configure_logs()
 with logger.catch():
-    app = FastAPI(title='Expert Services - PRTG Demo API', description=description)
+    app = FastAPI(title='Expert Services - PRTG Demo API', description=description, redoc_url=None)
 
 @app.post('/deployPrtg')
 async def deploy_prtg(token: str, name: str):
-    '''Start by clicking "Try it out", and enter the given token and a name for your demo. It will return a link to your demo PRTG instance.
+    '''Start by clicking "Try it out", and enter the given token and a name for your demo. It will return a link to your demo PRTG instance. This may take a few minutes. <br />
+    **These next steps is required!**<br />
+    1. After your PRTG instance is created, head to the link and log in. **Immediately change your password!**<br />
+    From the top naviagtion bar: **Setup > Account Settings > My Account**<br />
+    2. Select on "Devices" in the top left toolbar. You will see a tree structure of monitored devices. 
+    Right click on "Local Probe" and select "Add Device...". Put "demo" for the required "IPv4 Address/DNS Name" field. 
+    Now you're ready to import the devices from SNOW CMDB!
     \f
-    Creates demo PRTG instance inside Docker with fake devices pulled from SNOW CMDB.
+    Creates demo PRTG instance inside Docker with fake devices.
     Note: Order of creating PRTG and device containers matter. The PRTG docker-compose file creates
     a PRTG network first and then the device docker-compose file adds the devices to that network.
 
     Args:
+        token (str): A secret token.
         name (str): A name for the demo PRTG instance. It must be a valid subdomain name, i.e. it must
             start and end with an alphanumeric character and cannot have spaces or specials chatacters,
             except '-' (hyphen/minus symbol).
@@ -95,7 +103,6 @@ async def deploy_prtg(token: str, name: str):
             logger.debug(f'Creating device "{device["name"]}"...')
             docker.deploy_device(name, device['ip_address'], device['u_host_name'])
             logger.debug(f'Device "{device["name"]}" created.')
-        raise CalledProcessError(1, 'test')
     except CalledProcessError as e:
         logger.error(e)
         logger.debug('Removing device containers if it exists...')
@@ -103,14 +110,56 @@ async def deploy_prtg(token: str, name: str):
             docker.remove_devices(name, device['ip_address'], device['u_host_name'])
         logger.debug('Removing PRTG container and network...')
         docker.remove_prtg(name)
+        raise HTTPException(status_code=500)
     logger.info(f'{len(devices)} device containers created.')
 
-    # NOTE uncomment when PRTG container is ready
+    # Wait for PRTG instance to be ready
+    # TODO implement better way to actually know when it's done
+    logger.info('Waiting for PRTG to initialize...')
+    await asyncio.sleep(60)
+    logger.info('PRTG Initialized!')
+
     # Call api to build the PRTG build process
-    # snow_import.init_prtg()
+    url = f'https://{name.lower()}.{DOMAIN}'
     
-    logger.info(f'Successfully deployed PRTG instance \'{name}\' at {name.lower()}.{DOMAIN}.')
-    return f'Successfully deployed PRTG instance \'{name}\' at {name.lower()}.{DOMAIN}.'
+    logger.info(f'Successfully deployed PRTG instance \'{name}\' at {url}.')
+    return f'Successfully deployed PRTG instance \'{name}\' at {url}'
+
+@app.post('/importSnow')
+async def import_from_snow(token: str, prtgUrl: str):
+    '''**Complete the "Deploy PRTG" step before you begin this one!**<br />
+    Copy and paste the PRTG link given from the previous step and the token into the fields. Select "Execute" and head back to your PRTG instance.
+    Watch as the devices begin to populate. When this step is done, you can right click on the new devices and select "Run Auto-Discovery".
+    \f
+    Call XSAutomate API to initialize the new PRTG instance from SNOW CMDB. 
+
+    Args:
+        token (str): A secret token.
+        prtgUrl (str): PRTG domain name, optional http(s) prefix. Defaults to HTTPS if not included.
+    '''
+    logger.info('------------------------------------------------------------')
+    logger.info('Using XSAutomate API to import from SNOW CMDB...')
+    if token != TOKEN:
+        logger.warning('Unauthorized attempt made.')
+        raise HTTPException(status_code=401)
+
+    # Append http(s) if missing
+    if not re.match('^https?://', prtgUrl):
+        prtgUrl = 'https://' + prtgUrl
+
+    for i in range(1, ATTEMPTS + 1):
+        try:
+            snow_import.init_prtg(prtgUrl)
+            break
+        except (ConnectionError, HTTPError, Timeout) as e:
+            if i < ATTEMPTS:
+                logger.warning(f'Could not reach XSAutoamte API. ({i}) Trying again...')
+                await asyncio.sleep(5)
+                continue
+            logger.error(e)
+            raise HTTPException(status_code=500)
+    logger.info('Successfully imported from SNOW CMDB to PRTG.')
+    return f'Successfully imported from SNOW CMDB to PRTG. Try running Auto-Discovery on the devices to see what sensors it recommends!'
 
 # NOTE dev purposes only
 @app.delete('/dev/prtg/{name}', include_in_schema=False)
