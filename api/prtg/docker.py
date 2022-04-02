@@ -2,7 +2,10 @@ import os
 import subprocess
 from pathlib import PurePath
 
+from config import config
+
 MODULE_DIR = PurePath(__file__).parent
+DOMAIN = config['api']['domain']
 
 def deploy_prtg(name: str):
     '''Calls subprocess to deploy PRTG container in host Docker.
@@ -14,7 +17,7 @@ def deploy_prtg(name: str):
         subprocess.CalledProcessError if subprocess returned non-zero code
     '''
     name = name.strip().lower()
-    subprocess.run(['docker-compose', '-p', name, '-f', MODULE_DIR/'prtg-compose.yml', 'up', '-d'], env=dict(SUBDOMAIN=name, **os.environ), check=True)
+    subprocess.run(['docker-compose', '-p', name, '-f', MODULE_DIR/'prtg-compose.yml', 'up', '-d'], env=dict(SUBDOMAIN=name, DOMAIN=DOMAIN, **os.environ), check=True)
 
 def deploy_device(name: str, ip_addr: str, hostname: str):
     '''Calls subprocess to deploy test device container in host Docker.
@@ -41,7 +44,7 @@ def remove_prtg(name: str):
         subprocess.CalledProcessError if subprocess returned non-zero code
     '''
     name = name.strip().lower()
-    subprocess.run(['docker-compose', '-p', name, '-f', MODULE_DIR/'prtg-compose.yml', 'down'], env=dict(SUBDOMAIN=name, **os.environ), check=True)
+    subprocess.run(['docker-compose', '-p', name, '-f', MODULE_DIR/'prtg-compose.yml', 'down'], env=dict(SUBDOMAIN=name, DOMAIN=DOMAIN, **os.environ), check=True)
 
 def remove_devices(name: str, ip_addr: str, hostname: str):
     '''Calls subprocess to delete test device container in host Docker.

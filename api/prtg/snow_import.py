@@ -4,17 +4,19 @@ from config import config
 
 URL = config['prtg']['import_api_url']
 TOKEN = config['prtg']['import_api_token']
-TEMPLATE_GROUP = config['prtg']['import_api_token']
-TEMPLATE_DEVICE = config['prtg']['import_api_token']
+PROBE_ID = config['prtg'].getint('probe_id')
+TEMPLATE_GROUP = config['prtg'].getint('template_group')
+TEMPLATE_DEVICE = config['prtg'].getint('template_device')
+USERNAME = config['prtg']['username']
+PASSWORD = config['prtg']['password']
+IS_PASSHASH = config['prtg'].getboolean('is_passhash')
+UNPAUSE = config['prtg'].getboolean('unpause')
+COMPANY = config['prtg']['company']
+SITE_NAME = config['prtg']['site_name']
 
-def init_prtg(company_name: str,
-             site_name: str,
-             probe_id: int,
-             unpause: bool,
-             prtg_url: str,
-             username: str,
-             password: str,
-             is_passhash: bool):
+def init_prtg(prtg_url: str,
+             username: str = USERNAME,
+             password: str = PASSWORD):
     '''Call external XSAutomate API to stand up PRTG from SNow.
 
     Args:
@@ -28,14 +30,14 @@ def init_prtg(company_name: str,
     url = URL
     params = {
         'token': TOKEN,
-        'companyName': company_name,
-        'siteName': site_name,
-        'probeId': probe_id,
-        'unpause': unpause,
+        'companyName': COMPANY,
+        'siteName': SITE_NAME,
+        'probeId': PROBE_ID,
+        'unpause': UNPAUSE,
         'prtgUrl': prtg_url,
         'username': username,
         'password': password,
-        'isPasshash': is_passhash,
+        'isPasshash': IS_PASSHASH,
         'templateGroup': TEMPLATE_GROUP,
         'templateDevice': TEMPLATE_DEVICE
     }
