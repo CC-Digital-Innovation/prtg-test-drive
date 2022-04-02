@@ -3,7 +3,8 @@ services:
   caddy:
     environment:
       - CADDY_INGRESS_NETWORKS=caddy
-    image: lucaslorentz/caddy-docker-proxy:ci-alpine
+    image: caddy-docker-proxy:2.4.6-windowsservercore-1809
+    build: ./caddy-reverse-proxy
     networks:
       - caddy
     ports:
@@ -11,27 +12,36 @@ services:
       - 443:443
     restart: unless-stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - caddy_data:/data
+      - source: \\.\pipe\docker_engine\
+        target: \\.\pipe\docker_engine\
+        type: npipe
+      - caddy_data:c:/data
   xsautomate:
     image: xsautomate-api
     build: ./reconcile-snow-prtg
     restart: unless-stopped
+    networks:
+      - api
+      - default
   api:
     image: prtg-standup-api
     build: .
     labels:
-      caddy: localhost
+      caddy: api.${API_DOMAIN:-localhost}
       caddy.reverse_proxy: "{{upstreams 80}}"
     networks:
       - caddy
+      - api
     restart: unless-stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - source: \\.\pipe\docker_engine\
+        target: \\.\pipe\docker_engine\
+        type: npipe
   
 networks:
   caddy:
     external: true
+  api:
 
 volumes:
   caddy_data: {}
