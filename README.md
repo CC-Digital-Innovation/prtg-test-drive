@@ -41,7 +41,7 @@ COPY . .
 
 EXPOSE 80
 
-CMD [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80" ]
+CMD [ "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "80", "--workers", "2", "--loop", "asyncio" ]
 ```
 
 **Windows Server 2019 with Docker**
