@@ -20,9 +20,6 @@ services:
     image: xsautomate-api
     build: ./reconcile-snow-prtg
     restart: unless-stopped
-    networks:
-      - api
-      - default
   api:
     image: prtg-standup-api
     build: .
@@ -31,7 +28,7 @@ services:
       caddy.reverse_proxy: "{{upstreams 80}}"
     networks:
       - caddy
-      - api
+      - default
     restart: unless-stopped
     volumes:
       - source: \\.\pipe\docker_engine\
@@ -41,7 +38,6 @@ services:
 networks:
   caddy:
     external: true
-  api:
 
 volumes:
   caddy_data: {}

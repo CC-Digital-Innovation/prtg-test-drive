@@ -126,16 +126,16 @@ async def deploy_prtg(token: str, name: str):
     return f'Successfully deployed PRTG instance \'{name}\' at {url}'
 
 @app.post('/importSnow')
-async def import_from_snow(token: str, prtgUrl: str):
+async def import_from_snow(token: str, name: str):
     '''**Complete the "Deploy PRTG" step before you begin this one!**<br />
-    Copy and paste the PRTG link given from the previous step and the token into the fields. Select "Execute" and head back to your PRTG instance.
+    Use the same name from the previous step and the token into the fields. Select "Execute" and head back to your PRTG instance.
     Watch as the devices begin to populate. When this step is done, you can right click on the new devices and select "Run Auto-Discovery".
     \f
     Call XSAutomate API to initialize the new PRTG instance from SNOW CMDB. 
 
     Args:
         token (str): A secret token.
-        prtgUrl (str): PRTG domain name, optional http(s) prefix. Defaults to HTTPS if not included.
+        name (str): Name of PRTG Test Drive used in deploy_prtg()
     '''
     logger.info('------------------------------------------------------------')
     logger.info('Using XSAutomate API to import from SNOW CMDB...')
@@ -143,13 +143,15 @@ async def import_from_snow(token: str, prtgUrl: str):
         logger.warning('Unauthorized attempt made.')
         raise HTTPException(status_code=401)
 
-    # Append http(s) if missing
-    if not re.match('^https?://', prtgUrl):
-        prtgUrl = 'https://' + prtgUrl
+    # Check if PRTG Test Drive was created.
+    if not docker.name_exists(name):
+        raise HTTPException(status_code=400, detail=f'Cannot find PRTG Test Drive with name: \'{name}\'.')
+
+    url = f'https://{name.lower()}.{DOMAIN}'
 
     for i in range(1, ATTEMPTS + 1):
         try:
-            snow_import.init_prtg(prtgUrl)
+            snow_import.init_prtg(url)
             break
         except (ConnectionError, HTTPError, Timeout) as e:
             if i < ATTEMPTS:
@@ -158,6 +160,10 @@ async def import_from_snow(token: str, prtgUrl: str):
                 continue
             logger.error(e)
             raise HTTPException(status_code=500)
+
+    # Remove PRTG container from API network
+    docker.disconnect_from_network(name)
+
     logger.info('Successfully imported from SNOW CMDB to PRTG.')
     return f'Successfully imported from SNOW CMDB to PRTG. Try running Auto-Discovery on the devices to see what sensors it recommends!'
 

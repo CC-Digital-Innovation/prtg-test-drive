@@ -61,6 +61,15 @@ def remove_devices(name: str, ip_addr: str, hostname: str):
     subprocess.run(['docker-compose', '-p', f'{name}-{hostname}', '-f', MODULE_DIR/'device-compose.yml', 'down'], 
                     env=dict(PRTG_NAME=name, DEV_IP_ADDR=ip_addr, DEV_HOST=hostname, **os.environ), check=True)
 
+def disconnect_from_network(name: str):
+    '''Calls subprocess to disconnect test device container from api network.
+
+    Args:
+        name (str): Name of the test drive
+    '''
+    name = name.strip().lower()
+    subprocess.run(['docker', 'network', 'disconnect', 'prtg-test-drive_default', f'{name}_prtg_1'])
+
 def name_exists(name: str):
     '''Calls subprocess to filter for project name.
 
@@ -73,4 +82,4 @@ def name_exists(name: str):
     Raises:
         subprocess.CalledProcessError if subprocess returned non-zero code
     '''
-    return bool(subprocess.run(['docker', 'ps', '-a', '--format', '"{{.Names}}"', '--filter', f'name=^{name.strip().lower()}.*$'], text=True, check=True, capture_output=True).stdout)
+    return bool(subprocess.run(['docker', 'ps', '-a', '--format', '"{{.Names}}"', '--filter', f'name=^{name.strip().lower()}(-|_).*$'], text=True, check=True, capture_output=True).stdout)
